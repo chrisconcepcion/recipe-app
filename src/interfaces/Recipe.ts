@@ -8,4 +8,8 @@ export interface Recipe {
   description: string;
   ingredients: Ingredient[];
   phases: Phase[];
+  deleted?: boolean;
+  sourceUrl?: string;
+  calories?: string;
+  servingSize?: string;
 }

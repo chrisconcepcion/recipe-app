@@ -3,7 +3,7 @@ import { DriveImage } from '@/src/components/DriveImage';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 
 export default function RecipeDetailScreen() {
@@ -22,21 +22,36 @@ export default function RecipeDetailScreen() {
     }
 
     const handleDelete = () => {
-        Alert.alert(
-            "Delete Recipe",
-            `Are you sure you want to delete "${recipe.title}"?`,
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: () => {
-                        deleteRecipe(recipe.id);
-                        router.back();
-                    }
+        if (Platform.OS === 'web') {
+            if (window.confirm(`Are you sure you want to delete "${recipe.title}"?`)) {
+                deleteRecipe(recipe.id);
+                if (router.canGoBack()) {
+                    router.back();
+                } else {
+                    router.replace('/');
                 }
-            ]
-        );
+            }
+        } else {
+            Alert.alert(
+                "Delete Recipe",
+                `Are you sure you want to delete "${recipe.title}"?`,
+                [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                        text: "Delete",
+                        style: "destructive",
+                        onPress: () => {
+                            deleteRecipe(recipe.id);
+                            if (router.canGoBack()) {
+                                router.back();
+                            } else {
+                                router.replace('/');
+                            }
+                        }
+                    }
+                ]
+            );
+        }
     };
 
     const handleEdit = () => {
@@ -46,12 +61,44 @@ export default function RecipeDetailScreen() {
         });
     };
 
+    const openSourceUrl = () => {
+        if (recipe.sourceUrl) {
+            Linking.openURL(recipe.sourceUrl);
+        }
+    };
+
     return (
         <View style={styles.container}>
             <ScrollView contentContainerStyle={styles.content}>
                 <DriveImage source={{ uri: recipe.image }} style={styles.image} />
                 <Text style={styles.title}>{recipe.title}</Text>
+
+                {/* Meta Info Row */}
+                {(recipe.calories || recipe.servingSize) && (
+                    <View style={styles.metaContainer}>
+                        {recipe.calories && (
+                            <View style={styles.metaItem}>
+                                <Ionicons name="flame-outline" size={20} color="#FF6B6B" />
+                                <Text style={styles.metaText}>{recipe.calories} kcal</Text>
+                            </View>
+                        )}
+                        {recipe.servingSize && (
+                            <View style={styles.metaItem}>
+                                <Ionicons name="restaurant-outline" size={20} color="#4ECDC4" />
+                                <Text style={styles.metaText}>{recipe.servingSize}</Text>
+                            </View>
+                        )}
+                    </View>
+                )}
+
                 <Text style={styles.description}>{recipe.description}</Text>
+
+                {recipe.sourceUrl && (
+                    <TouchableOpacity onPress={openSourceUrl} style={styles.sourceLink}>
+                        <Ionicons name="link-outline" size={16} color="#007AFF" />
+                        <Text style={styles.sourceLinkText}>View Source Recipe</Text>
+                    </TouchableOpacity>
+                )}
 
                 <View style={styles.section}>
                     <Text style={styles.sectionHeader}>Ingredients</Text>
@@ -197,5 +244,33 @@ const styles = StyleSheet.create({
         padding: 8,
         borderRadius: 20,
         zIndex: 10,
+    },
+    metaContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: 16,
+        marginBottom: 16,
+        gap: 24,
+    },
+    metaItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    metaText: {
+        fontSize: 16,
+        color: '#555',
+        fontWeight: '500',
+    },
+    sourceLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        marginBottom: 24,
+        gap: 6,
+    },
+    sourceLinkText: {
+        color: '#007AFF',
+        fontSize: 16,
+        textDecorationLine: 'underline',
     },
 });

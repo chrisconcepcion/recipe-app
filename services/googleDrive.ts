@@ -13,13 +13,17 @@ export const GoogleDriveService = {
             const response = await fetch(`${DRIVE_API_URL}?q=${q}&spaces=drive`, {
                 headers: { Authorization: `Bearer ${accessToken}` },
             });
+
+            if (response.status === 401) throw new Error("UNAUTHENTICATED");
+
             const data = await response.json();
             if (data.files && data.files.length > 0) {
                 return data.files[0].id; // Return the first match
             }
             return null;
-        } catch (e) {
+        } catch (e: any) {
             console.error("Error finding file", e);
+            if (e.message === 'UNAUTHENTICATED') throw e;
             return null;
         }
     },
@@ -45,7 +49,13 @@ export const GoogleDriveService = {
                     body: JSON.stringify(metadata),
                 });
 
-                if (!createResponse.ok) console.error("Web: Create Metadata Failed", await createResponse.text());
+                if (createResponse.status === 401) throw new Error("UNAUTHENTICATED");
+
+                if (!createResponse.ok) {
+                    const errorText = await createResponse.text();
+                    console.error("Web: Create Metadata Failed", errorText);
+                    throw new Error("Failed to create file metadata: " + errorText);
+                }
 
                 const createData = await createResponse.json();
                 const fileId = createData.id;
@@ -81,11 +91,15 @@ export const GoogleDriveService = {
                     headers: { Authorization: `Bearer ${accessToken}` },
                     body: formData,
                 });
+
+                if (response.status === 401) throw new Error("UNAUTHENTICATED");
+
                 const data = await response.json();
                 return data.id;
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error("Error creating file", e);
+            if (e.message === 'UNAUTHENTICATED') throw e;
             throw e;
         }
     },
@@ -97,9 +111,13 @@ export const GoogleDriveService = {
             const response = await fetch(`${DRIVE_API_URL}/${fileId}?alt=media`, {
                 headers: { Authorization: `Bearer ${accessToken}` },
             });
+
+            if (response.status === 401) throw new Error("UNAUTHENTICATED");
+
             return await response.json();
-        } catch (e) {
+        } catch (e: any) {
             console.error("Error downloading data", e);
+            if (e.message === 'UNAUTHENTICATED') throw e;
             return [];
         }
     },
@@ -115,9 +133,13 @@ export const GoogleDriveService = {
                 },
                 body: JSON.stringify(data),
             });
+
+            if (response.status === 401) throw new Error("UNAUTHENTICATED");
+
             return response.status === 200;
-        } catch (e) {
+        } catch (e: any) {
             console.error("Error updating data", e);
+            if (e.message === 'UNAUTHENTICATED') throw e;
             return false;
         }
     },

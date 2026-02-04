@@ -1,3 +1,4 @@
+import { useAuth } from '@/contexts/AuthContext';
 import { useRecipeStore } from '@/hooks/useRecipeStore';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -11,15 +12,21 @@ const HomeScreen = () => {
     const router = useRouter();
     const { state: { recipes } } = useRecipeStore();
 
+    const { signOut } = useAuth();
+
     const handleAddRecipe = () => {
         router.push('/create-recipe');
     };
 
+    const activeRecipes = recipes.filter(r => !r.deleted);
+
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            <RecipeList recipeList={recipes} />
+            <RecipeList recipeList={activeRecipes} />
             <View style={styles.footer}>
                 <Button title="Add Recipe" onPress={handleAddRecipe} />
+                <View style={{ height: 12 }} />
+                <Button title="Sign Out" onPress={signOut} color="#FF3B30" />
             </View>
         </SafeAreaView>
     );

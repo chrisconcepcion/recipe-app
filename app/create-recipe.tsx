@@ -41,6 +41,9 @@ export default function CreateRecipeScreen() {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [image, setImage] = useState('');
+    const [sourceUrl, setSourceUrl] = useState('');
+    const [calories, setCalories] = useState('');
+    const [servingSize, setServingSize] = useState('');
     const [ingredients, setIngredients] = useState<Ingredient[]>([]);
     const [phases, setPhases] = useState<Phase[]>([]);
 
@@ -68,6 +71,9 @@ export default function CreateRecipeScreen() {
                 setTitle(existingRecipe.title);
                 setDescription(existingRecipe.description);
                 setImage(existingRecipe.image);
+                setSourceUrl(existingRecipe.sourceUrl || '');
+                setCalories(existingRecipe.calories || '');
+                setServingSize(existingRecipe.servingSize || '');
                 setIngredients(existingRecipe.ingredients || []);
                 setPhases(existingRecipe.phases || []);
                 setIsLoaded(true);
@@ -199,6 +205,9 @@ export default function CreateRecipeScreen() {
                 title,
                 description,
                 image,
+                sourceUrl,
+                calories,
+                servingSize,
                 ingredients,
                 phases,
             };
@@ -264,6 +273,42 @@ export default function CreateRecipeScreen() {
                         placeholder="Describe your delicious creation..."
                         multiline
                     />
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.label}>Details (Optional)</Text>
+                    <View style={styles.row}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.subLabel}>Calories (kcal)</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={calories}
+                                onChangeText={setCalories}
+                                placeholder="e.g. 450"
+                                keyboardType="numeric"
+                            />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.subLabel}>Serving Size</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={servingSize}
+                                onChangeText={setServingSize}
+                                placeholder="e.g. 2 servings"
+                            />
+                        </View>
+                    </View>
+                    <View style={{ marginTop: 8 }}>
+                        <Text style={styles.subLabel}>Source URL</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={sourceUrl}
+                            onChangeText={setSourceUrl}
+                            placeholder="https://..."
+                            autoCapitalize="none"
+                            keyboardType="url"
+                        />
+                    </View>
                 </View>
 
                 <View style={styles.section}>
@@ -415,6 +460,12 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginBottom: 8,
         color: '#444',
+    },
+    subLabel: {
+        fontSize: 14,
+        fontWeight: '500',
+        marginBottom: 4,
+        color: '#666',
     },
     input: {
         borderWidth: 1,

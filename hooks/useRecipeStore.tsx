@@ -91,7 +91,9 @@ const reducer = (state: State, action: Action): State => {
     case 'DELETE_RECIPE':
       return {
         ...state,
-        recipes: state.recipes.filter((recipe) => recipe.id !== action.payload),
+        recipes: state.recipes.map((recipe) =>
+          recipe.id === action.payload ? { ...recipe, deleted: true } : recipe
+        ),
       };
     default:
       return state;
@@ -105,44 +107,52 @@ const RecipeStoreContext = createContext<[State, React.Dispatch<Action>]>([
 
 export const useRecipeStore = () => {
   const [state, dispatch] = useContext(RecipeStoreContext);
-  const { accessToken } = useAuth();
+  const { accessToken, signOut } = useAuth();
 
   // Helper to handle all image uploads for a recipe
   const processRecipeImages = async (recipe: Recipe): Promise<Recipe> => {
     if (!accessToken) return recipe;
 
-    let updatedRecipe = { ...recipe };
+    try {
+      let updatedRecipe = { ...recipe };
 
-    // 1. Upload Main Image
-    if (updatedRecipe.image && !updatedRecipe.image.startsWith('http')) {
-      // If it's already a drive ID, skip. If it's a local URI, upload.
-      if (!updatedRecipe.image.startsWith('google-drive-id:')) {
-        const fileId = await GoogleDriveService.uploadImage(accessToken, updatedRecipe.image);
-        if (fileId) {
-          updatedRecipe.image = `google-drive-id:${fileId}`;
+      // 1. Upload Main Image
+      if (updatedRecipe.image && !updatedRecipe.image.startsWith('http')) {
+        // If it's already a drive ID, skip. If it's a local URI, upload.
+        if (!updatedRecipe.image.startsWith('google-drive-id:')) {
+          const fileId = await GoogleDriveService.uploadImage(accessToken, updatedRecipe.image);
+          if (fileId) {
+            updatedRecipe.image = `google-drive-id:${fileId}`;
+          }
         }
       }
-    }
 
-    // 2. Upload Phase Images
-    if (updatedRecipe.phases) {
-      const updatedPhases = await Promise.all(updatedRecipe.phases.map(async (phase) => {
-        if (phase.photoUris && phase.photoUris.length > 0) {
-          const newUris = await Promise.all(phase.photoUris.map(async (uri) => {
-            if (!uri.startsWith('http') && !uri.startsWith('google-drive-id:')) {
-              const fileId = await GoogleDriveService.uploadImage(accessToken, uri);
-              return fileId ? `google-drive-id:${fileId}` : uri;
-            }
-            return uri;
-          }));
-          return { ...phase, photoUris: newUris };
-        }
-        return phase;
-      }));
-      updatedRecipe.phases = updatedPhases;
-    }
+      // 2. Upload Phase Images
+      if (updatedRecipe.phases) {
+        const updatedPhases = await Promise.all(updatedRecipe.phases.map(async (phase) => {
+          if (phase.photoUris && phase.photoUris.length > 0) {
+            const newUris = await Promise.all(phase.photoUris.map(async (uri) => {
+              if (!uri.startsWith('http') && !uri.startsWith('google-drive-id:')) {
+                const fileId = await GoogleDriveService.uploadImage(accessToken, uri);
+                return fileId ? `google-drive-id:${fileId}` : uri;
+              }
+              return uri;
+            }));
+            return { ...phase, photoUris: newUris };
+          }
+          return phase;
+        }));
+        updatedRecipe.phases = updatedPhases;
+      }
 
-    return updatedRecipe;
+      return updatedRecipe;
+    } catch (e: any) {
+      if (e.message === 'UNAUTHENTICATED') {
+        console.log("Session expired during image upload. Logging out.");
+        signOut();
+      }
+      return recipe; // Return original recipe if failed? Or throw?
+    }
   };
 
   const addRecipe = async (recipe: Recipe) => {
@@ -165,7 +175,7 @@ export const useRecipeStore = () => {
 
 export const RecipeStoreProvider = ({ children }: any) => {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const { user, accessToken } = useAuth();
+  const { user, accessToken, signOut } = useAuth();
   const [driveFileId, setDriveFileId] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -174,22 +184,29 @@ export const RecipeStoreProvider = ({ children }: any) => {
     const initDriveSync = async () => {
       if (!accessToken) return;
 
-      // 1. Find or Create config file
-      let fileId = await GoogleDriveService.findComponentsFile(accessToken);
-      if (!fileId) {
-        console.log("No recipes file found, creating...");
-        fileId = await GoogleDriveService.createFile(accessToken);
-      }
-
-      if (fileId) {
-        setDriveFileId(fileId);
-        console.log("Syncing with Drive File:", fileId);
-        // 2. Load Data
-        const data = await GoogleDriveService.downloadData(accessToken, fileId);
-        if (Array.isArray(data)) {
-          dispatch({ type: 'SET_RECIPES', payload: data });
+      try {
+        // 1. Find or Create config file
+        let fileId = await GoogleDriveService.findComponentsFile(accessToken);
+        if (!fileId) {
+          console.log("No recipes file found, creating...");
+          fileId = await GoogleDriveService.createFile(accessToken);
         }
-        setIsInitialized(true); // Mark as ready to save changes
+
+        if (fileId) {
+          setDriveFileId(fileId);
+          console.log("Syncing with Drive File:", fileId);
+          // 2. Load Data
+          const data = await GoogleDriveService.downloadData(accessToken, fileId);
+          if (Array.isArray(data)) {
+            dispatch({ type: 'SET_RECIPES', payload: data });
+          }
+          setIsInitialized(true); // Mark as ready to save changes
+        }
+      } catch (e: any) {
+        if (e.message === 'UNAUTHENTICATED') {
+          console.log("Session expired while syncing. Logging out.");
+          signOut();
+        }
       }
     };
 
@@ -203,7 +220,14 @@ export const RecipeStoreProvider = ({ children }: any) => {
 
       // Debounce? For now just save.
       console.log("Saving to Drive (Debounced)...");
-      await GoogleDriveService.updateData(accessToken, driveFileId, state.recipes);
+      try {
+        await GoogleDriveService.updateData(accessToken, driveFileId, state.recipes);
+      } catch (e: any) {
+        if (e.message === 'UNAUTHENTICATED') {
+          console.log("Session expired while saving. Logging out.");
+          signOut();
+        }
+      }
     };
 
     // Only set timeout if initialized
